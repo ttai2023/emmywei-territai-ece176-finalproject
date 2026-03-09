@@ -1,4 +1,4 @@
-# This is the main 2D U-Net File
+# 2D U-Net Model
 
 import torch
 import torch.nn as nn
