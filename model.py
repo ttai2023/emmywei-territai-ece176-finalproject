@@ -16,16 +16,16 @@ class DoubleConv(nn.Module):
 
         # block 2
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, stride=1)
-        self.relu2 = nn.ReLU(inplace=True)
         self.bn2 = nn.BatchNorm2d(out_channels)
-
+        self.relu2 = nn.ReLU(inplace=True)
+        
     def forward(self, x):
         x = self.relu1(self.bn1(self.conv1(x)))
         x = self.relu2(self.bn2(self.conv2(x)))
         return x      
 
 class UNet(nn.Module):
-    def __init__(self, in_channels=4, out_classes=4):
+    def __init__(self, in_channels=4, out_channels=3):
         super(UNet, self).__init__()
         
         # ENCODER (Downsampling)
@@ -68,7 +68,7 @@ class UNet(nn.Module):
         self.dec4 = DoubleConv(1024, 512) 
         
         # OUTPUT
-        self.finalconv = nn.Conv2d(64, out_classes, kernel_size=1)
+        self.finalconv = nn.Conv2d(64, out_channels, kernel_size=1)
 
     def forward(self, x):
 
