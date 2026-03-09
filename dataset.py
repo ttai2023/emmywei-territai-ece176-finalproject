@@ -22,26 +22,59 @@ class BraTSDataset(Dataset):
     def __getitem__(self, idx):
         # TODO: 1. Open the HDF5/NIfTI file at self.file_paths[idx]
         file_path = self.file_paths[idx]
+        
         # TODO: 2. Extract the 4 MRI modalities (T1, T1CE, T2, FLAIR)
         with h5py.File(file_path, "r") as f:
             image = f["image"][:].astype(np.float32)
-            mask = f["mask"][:].astype(np.float32)
+            mask = f["mask"][:]
+            
         # TODO: 3. Stack them into a numpy array of shape (4, H, W)
-        if image.shape[-1] == 4:
+        if image.ndim == 3 and image.shape[-1] == 4:
             image = np.transpose(image, (2, 0, 1))
+        elif image.ndim == 3 and image.shape[0] == 4:
+            pass
+
+        image = image.astype(np.float32)
+            
         # TODO: 4. Extract the ground truth segmentation mask of shape (1, H, W) or (Classes, H, W)
         if mask.ndim == 2:
-            mask = np.expand_dims(mask, axis=0)
+            whole_tumor = (mask > 0).astype(np.float32)
+            tumor_core = np.isin(mask, [1, 4]).astype(np.float32)
+            enhancing_tumor = (mask == 4).astype(np.float32)
+            mask = np.stack([whole_tumor, tumor_core, enhancing_tumor], axis=0)
+
+        elif mask.ndim == 3 and mask.shape[-1] == 3:
+            mask = np.transpose(mask, (2, 0, 1)).astype(np.float32)
+
+        elif mask.ndim == 3 and mask.shape[0] == 3:
+            mask = mask.astype(np.float32)
+
+        elif mask.ndim == 3 and mask.shape[-1] == 1:
+            mask = np.squeeze(mask, axis=-1)
+            whole_tumor = (mask > 0).astype(np.float32)
+            tumor_core = np.isin(mask, [1, 4]).astype(np.float32)
+            enhancing_tumor = (mask == 4).astype(np.float32)
+            mask = np.stack([whole_tumor, tumor_core, enhancing_tumor], axis=0)
+
+        elif mask.ndim == 3 and mask.shape[0] == 1:
+            mask = np.squeeze(mask, axis=0)
+            whole_tumor = (mask > 0).astype(np.float32)
+            tumor_core = np.isin(mask, [1, 4]).astype(np.float32)
+            enhancing_tumor = (mask == 4).astype(np.float32)
+            mask = np.stack([whole_tumor, tumor_core, enhancing_tumor], axis=0)
 
         if self.transform:
-            # TODO: Apply augmentations (random flip, rotation, etc.)
-            augmented = self.transform(image=image, mask=mask)
-            image = augmented["image"]
-            mask = augmented["mask"]
+            image_hwc = np.transpose(image, (1, 2, 0))
+            mask_hwc = np.transpose(mask, (1, 2, 0))
+
+            augmented = self.transform(image=image_hwc, mask=mask_hwc)
+
+            image = np.transpose(augmented["image"], (2, 0, 1))
+            mask = np.transpose(augmented["mask"], (2, 0, 1))
 
         # Convert to PyTorch tensors
-        image_tensor = torch.from_numpy(image)
-        mask_tensor = torch.from_numpy(mask)
+        image_tensor = torch.from_numpy(image).float()
+        mask_tensor = torch.from_numpy(mask).float()
 
         return image_tensor, mask_tensor
 
